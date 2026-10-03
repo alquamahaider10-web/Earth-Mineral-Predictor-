@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoMiner ML — Intelligent Mineral Prospectivity & GIS Analysis</title>
+    
+    <!-- Tailwind CSS Play CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#090a0f',
+                        glasscard: 'rgba(18, 20, 29, 0.65)',
+                        primary: '#6366f1',
+                        secondary: '#10b981',
+                        accent: '#f59e0b',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Header Section -->
+    <header class="border-b border-[rgba(255,255,255,0.08)] bg-[rgba(9,10,15,0.8)] backdrop-blur-md sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <!-- Logo Icon (SVG) -->
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-wide text-white font-display">GeoMiner <span class="text-indigo-400">ML</span></h1>
+                <p class="text-xs text-gray-400">Spatial Mineral Prospectivity & Spectral Identification Dashboard</p>
+            </div>
+        </div>
+        
+        <!-- Status indicator & server control -->
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full text-xs text-emerald-400">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                <span>Server Connected</span>
+            </div>
+            
+            <button id="btn-re-simulate" class="btn-secondary px-4 py-1.5 rounded-lg text-xs font-semibold text-white flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18.5" />
+                </svg>
+                Generate New Basin
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Layout -->
+    <main class="flex-grow p-6 grid grid-cols-1 xl:grid-cols-4 gap-6 max-w-[1920px] mx-auto w-full">
+        
+        <!-- Column 1: Config and Controls -->
+        <section class="xl:col-span-1 flex flex-col gap-6">
+            
+            <!-- Simulation & Geology Context -->
+            <div class="glass-card p-5 flex flex-col gap-4">
+                <div class="flex items-center justify-between border-b border-[rgba(255,255,255,0.08)] pb-3">
+                    <h2 class="text-md font-semibold text-white tracking-wide flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                        Geological Context
+                    </h2>
+                    <span id="txt-basin-model" class="text-[10px] bg-indigo-500/20 text-indigo-300 font-semibold px-2 py-0.5 rounded uppercase">Orogenic Gold</span>
+                </div>
+                
+                <div class="text-xs text-gray-400 leading-relaxed flex flex-col gap-2">
+                    <p>
+                        Currently loaded: <span class="text-white font-medium">Arc-Volcanic Basin Model</span> (50x50 km).
+                    </p>
+                    <p>
+                        The simulated grid models geological fault vectors, geochemical assays (Cu, Au), physical anomalies (Magnetics, Gravity), and spectral alteration indices (Hydroxyl, Fe-Oxides).
+                    </p>
+                    <div class="grid grid-cols-2 gap-2 mt-2">
+                        <div class="bg-white/5 border border-white/5 rounded p-2 text-center">
+                            <div class="text-[10px] text-gray-500 uppercase">Grid Points</div>
+                            <div id="stat-grid-points" class="text-md font-semibold text-white font-display">2,500</div>
+                        </div>
+                        <div class="bg-white/5 border border-white/5 rounded p-2 text-center">
+                            <div class="text-[10px] text-gray-500 uppercase">Known Deposits</div>
+                            <div id="stat-deposits" class="text-md font-semibold text-emerald-400 font-display">32</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Machine Learning Model Configurator -->
+            <div class="glass-card p-5 flex flex-col gap-5 flex-grow">
+                <div class="border-b border-[rgba(255,255,255,0.08)] pb-3">
+                    <h2 class="text-md font-semibold text-white tracking-wide flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        ML Model Configurations
+                    </h2>
+                </div>
+                
+                <!-- Model Selector -->
+                <div class="flex flex-col gap-2">
+                    <label class="text-xs text-gray-400 font-medium">Predictive Algorithm</label>
+                    <select id="select-model" class="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors">
+                        <option value="random_forest">Random Forest Classifier</option>
+                        <option value="gradient_boosting">Gradient Boosting Classifier</option>
+                        <option value="svm">Support Vector Machine (RBF)</option>
+                    </select>
+                </div>
+                
+                <!-- Hyperparameters sliders (dynamic show/hide) -->
+                <div class="flex flex-col gap-4 border-t border-[rgba(255,255,255,0.05)] pt-4">
+                    <h3 class="text-xs text-gray-400 uppercase tracking-wider font-semibold">Hyperparameters</h3>
+                    
+                    <div id="hyperparams-rf" class="flex flex-col gap-4">
+                        <div class="flex flex-col gap-1.5">
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="text-gray-300">Estimators (Trees)</span>
+                                <span id="val-rf-trees" class="font-semibold text-white">100</span>
+                            </div>
+                            <input type="range" id="input-rf-trees" min="10" max="300" step="10" value="100">
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="text-gray-300">Max Depth</span>
+                                <span id="val-rf-depth" class="font-semibold text-white">8</span>
+                            </div>
+                            <input type="range" id="input-rf-depth" min="2" max="20" step="1" value="8">
+                        </div>
+                    </div>
+
+                    <div id="hyperparams-gb" class="flex flex-col gap-4 hidden">
+                        <div class="flex flex-col gap-1.5">
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="text-gray-300">Estimators</span>
+                                <span id="val-gb-trees" class="font-semibold text-white">100</span>
+                            </div>
+                            <input type="range" id="input-gb-trees" min="10" max="250" step="10" value="100">
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="text-gray-300">Learning Rate</span>
+                                <span id="val-gb-lr" class="font-semibold text-white">0.10</span>
+                            </div>
+                            <input type="range" id="input-gb-lr" min="0.01" max="0.5" step="0.01" value="0.10">
+                        </div>
+                    </div>
+
+                    <div id="hyperparams-svm" class="flex flex-col gap-4 hidden">
+                        <div class="flex flex-col gap-1.5">
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="text-gray-300">Regularization (C)</span>
+                                <span id="val-svm-c" class="font-semibold text-white">1.0</span>
+                            </div>
+                            <input type="range" id="input-svm-c" min="0.1" max="10" step="0.1" value="1.0">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Features Checklist -->
+                <div class="flex flex-col gap-3 border-t border-[rgba(255,255,255,0.05)] pt-4">
+                    <h3 class="text-xs text-gray-400 uppercase tracking-wider font-semibold">GIS Predictor Layers</h3>
+                    
+                    <div class="grid grid-cols-1 gap-2 text-xs">
+                        <label class="flex items-center gap-2 cursor-pointer py-1.5 px-2.5 rounded hover:bg-white/5 transition-colors">
+                            <input type="checkbox" name="feature" value="fault_dist" checked class="rounded accent-indigo-500">
+                            <span class="text-gray-300">Fault Distance (Structural)</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer py-1.5 px-2.5 rounded hover:bg-white/5 transition-colors">
+                            <input type="checkbox" name="feature" value="mag_anomaly" checked class="rounded accent-indigo-500">
+                            <span class="text-gray-300">Magnetic Anomaly (Geophysics)</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer py-1.5 px-2.5 rounded hover:bg-white/5 transition-colors">
+                            <input type="checkbox" name="feature" value="grav_anomaly" checked class="rounded accent-indigo-500">
+                            <span class="text-gray-300">Gravity Anomaly (Geophysics)</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer py-1.5 px-2.5 rounded hover:bg-white/5 transition-colors">
+                            <input type="checkbox" name="feature" value="cu_ppm" checked class="rounded accent-indigo-500">
+                            <span class="text-gray-300">Copper soil assays (Geochem)</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer py-1.5 px-2.5 rounded hover:bg-white/5 transition-colors">
+                            <input type="checkbox" name="feature" value="au_ppb" checked class="rounded accent-indigo-500">
+                            <span class="text-gray-300">Gold soil assays (Geochem)</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer py-1.5 px-2.5 rounded hover:bg-white/5 transition-colors">
+                            <input type="checkbox" name="feature" value="hydroxyl_idx" checked class="rounded accent-indigo-500">
+                            <span class="text-gray-300">Hydroxyl alteration (Spectral)</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer py-1.5 px-2.5 rounded hover:bg-white/5 transition-colors">
+                            <input type="checkbox" name="feature" value="fe_oxide_idx" checked class="rounded accent-indigo-500">
+                            <span class="text-gray-300">Fe-Oxide alteration (Spectral)</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Action button -->
+                <button id="btn-train" class="w-full btn-primary py-3 rounded-xl text-white text-sm font-semibold tracking-wider flex items-center justify-center gap-2 mt-auto">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    Train & Map Prospectivity
+                </button>
+            </div>
+        </section>
+        
+        <!-- Column 2 & 3: GIS Map Workspace -->
+        <section class="xl:col-span-2 flex flex-col gap-6 h-[85vh]">
+            
+            <!-- Map Card -->
+            <div class="glass-card flex-grow p-4 flex flex-col relative h-[65%] min-h-[400px]">
+                <div class="flex items-center justify-between mb-3 border-b border-[rgba(255,255,255,0.08)] pb-2.5">
+                    <h2 class="text-md font-semibold text-white tracking-wide flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                        </svg>
+                        Interactive GIS GIS Map
+                    </h2>
+                    
+                    <!-- Layer control triggers -->
+                    <div class="flex items-center gap-2 text-xs">
+                        <span class="text-gray-400 font-medium">Display Layer:</span>
+                        <div class="flex border border-white/10 rounded overflow-hidden">
+                            <button id="layer-none" class="px-2.5 py-1 bg-indigo-500/20 text-white font-medium border-r border-white/10">Base Geology</button>
+                            <button id="layer-heat" class="px-2.5 py-1 bg-white/5 text-gray-400 hover:text-white font-medium" disabled>Prospectivity ML</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Leaflet container -->
+                <div id="map" class="flex-grow z-0"></div>
+                
+                <!-- Floating Map Details Overlay HUD -->
+                <div id="hud" class="absolute bottom-6 left-6 z-[1000] bg-[rgba(9,10,15,0.85)] border border-[rgba(255,255,255,0.15)] rounded-xl p-4 text-xs shadow-2xl backdrop-blur-md max-w-sm hidden">
+                    <div class="flex items-center justify-between border-b border-white/10 pb-1.5 mb-2">
+                        <h4 class="font-bold text-white tracking-wide">HUD Core Sampling</h4>
+                        <span class="text-gray-500 font-semibold uppercase text-[9px]">Probe</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-gray-300">
+                        <div>Easting: <span id="hud-east" class="font-semibold text-white">-</span></div>
+                        <div>Northing: <span id="hud-north" class="font-semibold text-white">-</span></div>
+                        <div>Fault Dist: <span id="hud-fault" class="font-semibold text-white">-</span></div>
+                        <div>Magnetics: <span id="hud-mag" class="font-semibold text-white">-</span></div>
+                        <div>Gravity: <span id="hud-grav" class="font-semibold text-white">-</span></div>
+                        <div>Lithology: <span id="hud-litho" class="font-semibold text-white">-</span></div>
+                        <div>Cu (Assay): <span id="hud-cu" class="font-semibold text-indigo-400">-</span></div>
+                        <div>Au (Assay): <span id="hud-au" class="font-semibold text-amber-400">-</span></div>
+                        <div class="col-span-2 border-t border-white/5 pt-1.5 mt-1 flex justify-between items-center">
+                            <span class="font-bold text-white">Prospectivity Index:</span>
+                            <span id="hud-prob" class="font-extrabold text-md text-emerald-400">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Map Explanatory Card -->
+            <div class="glass-card p-5 h-[35%] flex flex-col gap-4 overflow-y-auto">
+                <h3 class="text-xs text-gray-400 uppercase tracking-wider font-semibold">GIS Map Legend & Context</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-gray-400 leading-relaxed">
+                    <div class="flex flex-col gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full bg-amber-400 border border-amber-300 flex-shrink-0 animate-pulse"></span>
+                            <span class="text-white font-medium">Known Occurrences</span>
+                        </div>
+                        <p>Yellow markers show ground-truth drill sites or mine workings where mineralized ores were validated. Used as the 1 (positive) training label.</p>
+                        
+                        <div class="flex items-center gap-2 mt-2">
+                            <span class="w-6 h-0.5 border-t border-dashed border-red-500 flex-shrink-0"></span>
+                            <span class="text-white font-medium">Fault Systems</span>
+                        </div>
+                        <p>Red dashed lines depict structural faults. Fluid flows preferentially deposit minerals near fault walls and shear conduits.</p>
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-3.5 h-3.5 rounded bg-indigo-600/30 border border-indigo-400 flex-shrink-0"></span>
+                            <span class="text-white font-medium">Lithological Units (Base Map)</span>
+                        </div>
+                        <p>Colors represent underlying bedrock: Shales (deep gray), Limestones (teal), Granitic Batholith (dark red), and Mafic Volcanics (dark blue).</p>
+                        
+                        <div class="flex items-center gap-2 mt-2">
+                            <div class="w-16 h-3 rounded bg-gradient-to-r from-purple-950 via-indigo-600 to-yellow-400 border border-white/10 flex-shrink-0"></div>
+                            <span class="text-white font-medium">ML Prospectivity Heatmap</span>
+                        </div>
+                        <p>Ranges from purple (lowest potential, 0%) to yellow (highest exploration potential, 100%). Overlaid after model training runs.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Column 4: ML Analytics & Spectroscopy Lab -->
+        <section class="xl:col-span-1 flex flex-col gap-6">
+            
+            <!-- ML Metrics Card -->
+            <div id="card-metrics" class="glass-card p-5 flex flex-col gap-4">
+                <h2 class="text-md font-semibold text-white tracking-wide border-b border-[rgba(255,255,255,0.08)] pb-3 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
+                    </svg>
+                    ML Model Analytics
+                </h2>
+                
+                <div id="metrics-placeholder" class="text-xs text-gray-500 py-6 text-center italic">
+                    Train the model to see feature importances and validation scores.
+                </div>
+                
+                <!-- Active metrics HUD -->
+                <div id="metrics-container" class="hidden flex flex-col gap-4">
+                    <!-- Gauge values -->
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="bg-white/5 border border-white/5 rounded p-2 text-center">
+                            <div class="text-[10px] text-gray-400">Accuracy</div>
+                            <div id="metric-acc" class="text-sm font-bold text-white font-display">-</div>
+                        </div>
+                        <div class="bg-white/5 border border-white/5 rounded p-2 text-center">
+                            <div class="text-[10px] text-gray-400">F1 Score</div>
+                            <div id="metric-f1" class="text-sm font-bold text-indigo-400 class font-display">-</div>
+                        </div>
+                        <div class="bg-white/5 border border-white/5 rounded p-2 text-center">
+                            <div class="text-[10px] text-gray-400">ROC AUC</div>
+                            <div id="metric-auc" class="text-sm font-bold text-emerald-400 font-display">-</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Chart.js feature importance canvas -->
+                    <div class="h-44 w-full relative">
+                        <canvas id="chart-importance"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Spectral Mineralogy Identification Lab -->
+            <div class="glass-card p-5 flex flex-col gap-4 flex-grow">
+                <h2 class="text-md font-semibold text-white tracking-wide border-b border-[rgba(255,255,255,0.08)] pb-3 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                    </svg>
+                    Hyperspectral Rock Lab
+                </h2>
+                
+                <div class="text-xs text-gray-400 leading-relaxed mb-1">
+                    Simulate custom mineral concentrations in a rock core sample to measure reflectance curves (400-2500nm).
+                </div>
+                
+                <!-- Composition sliders -->
+                <div class="flex flex-col gap-2.5 bg-white/5 border border-white/5 rounded-lg p-3 text-xs">
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between text-gray-300">
+                            <span>Alunite (Clay alteration)</span>
+                            <span id="pct-alunite" class="font-bold text-white">40%</span>
+                        </div>
+                        <input type="range" id="slide-alunite" min="0" max="100" step="5" value="40" class="accent-indigo-500">
+                    </div>
+                    
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between text-gray-300">
+                            <span>Kaolinite (Clay doublet)</span>
+                            <span id="pct-kaolinite" class="font-bold text-white">30%</span>
+                        </div>
+                        <input type="range" id="slide-kaolinite" min="0" max="100" step="5" value="30" class="accent-indigo-500">
+                    </div>
+
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between text-gray-300">
+                            <span>Hematite (Iron Oxide)</span>
+                            <span id="pct-hematite" class="font-bold text-white">10%</span>
+                        </div>
+                        <input type="range" id="slide-hematite" min="0" max="100" step="5" value="10" class="accent-indigo-500">
+                    </div>
+
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between text-gray-300">
+                            <span>Chalcopyrite (Sulfide)</span>
+                            <span id="pct-chalco" class="font-bold text-white">0%</span>
+                        </div>
+                        <input type="range" id="slide-chalco" min="0" max="100" step="5" value="0" class="accent-indigo-500">
+                    </div>
+                </div>
+                
+                <!-- Acquire spectrum action -->
+                <button id="btn-acquire" class="btn-secondary py-2 rounded-lg text-xs font-semibold text-white w-full">
+                    Acquire Reflectance Curve
+                </button>
+                
+                <!-- Spectral plot and SAM results -->
+                <div id="spectral-results-container" class="hidden flex flex-col gap-4 border-t border-[rgba(255,255,255,0.05)] pt-3 flex-grow">
+                    <!-- Chart canvas -->
+                    <div class="h-32 w-full relative">
+                        <canvas id="chart-spectral"></canvas>
+                    </div>
+                    
+                    <!-- SAM Classifier readout -->
+                    <div class="flex flex-col gap-1 text-xs">
+                        <div class="flex justify-between font-bold text-white border-b border-white/5 pb-1">
+                            <span>SAM Identification Result</span>
+                            <span id="sam-best-mineral" class="text-amber-400 uppercase">-</span>
+                        </div>
+                        <div class="flex justify-between text-gray-400 py-1">
+                            <span>Spectral Match Angle:</span>
+                            <span id="sam-angle" class="text-white font-medium">-</span>
+                        </div>
+                        <div class="flex justify-between text-gray-400">
+                            <span>Confidence Score:</span>
+                            <span id="sam-score" class="text-emerald-400 font-bold">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+    </main>
+
+    <!-- Custom App JS -->
+    <script src="app.js"></script>
+</body>
+</html>
